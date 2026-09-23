@@ -1,18 +1,34 @@
-*.iml
+# ──────────────────────────────────────────────────────────
+#  Android / Gradle / Kotlin  —  MockLocation
+# ──────────────────────────────────────────────────────────
+
+# ── Gradle ───────────────────────────────────────────────
 .gradle/
-/local.properties
-/.idea/
-.DS_Store
-/build/
-/captures/
-.externalNativeBuild/
-.cxx/
+build/
 local.properties
-*.hprof
+.kotlin/
+
+# ── IDE ──────────────────────────────────────────────────
+.idea/
+*.iml
+.DS_Store
+
+# ── Android ─────────────────────────────────────────────
+app/build/
 *.apk
 *.aab
-/app/build/
-/app/release/
-/app/debug/
+*.ap_
+
+# ── OS ───────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Misc ─────────────────────────────────────────────────
 *.log
-.kotlin/
+*.tmp
+*.swp
+*.swo
+*~
+
+# ── Tooling ──────────────────────────────────────────────
+.codegraph/

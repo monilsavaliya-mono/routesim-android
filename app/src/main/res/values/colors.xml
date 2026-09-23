@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="routesim_primary">#1B5E20</color>
-    <color name="routesim_primary_dark">#003300</color>
-    <color name="routesim_background">#FFFFFF</color>
-    <color name="routesim_background_dark">#101410</color>
+    <!-- Mirrors ui/theme/Theme.kt (Cockpit tokens) for the pre-Compose shell. -->
+    <color name="void_bg">#FF04060B</color>
+    <color name="panel">#FF0E1420</color>
+    <color name="live">#FF22D3EE</color>
+    <color name="start_marker">#FF34D399</color>
+    <color name="end_marker">#FFFB7185</color>
+    <color name="ink">#FFE8F0FA</color>
+    <color name="primary">#FF22D3EE</color>
 </resources>

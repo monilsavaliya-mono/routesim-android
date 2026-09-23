@@ -1,9 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Pre-Compose window theme; actual Material3 theming is applied by RouteSimTheme in Compose. -->
-    <style name="Theme.RouteSim" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:statusBarColor">@color/routesim_primary</item>
-        <item name="android:windowBackground">@color/routesim_background</item>
-        <item name="android:navigationBarColor">@color/routesim_primary_dark</item>
+    <!--
+      Dark, bar-less shell. enableEdgeToEdge() in MainActivity paints the system
+      bars transparent at runtime; windowBackground here prevents a white flash
+      during the cold-start window before Compose draws.
+    -->
+    <style name="Theme.MockLocation" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/void_bg</item>
+        <item name="android:colorBackground">@color/void_bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:windowLightStatusBar">false</item>
     </style>
 </resources>

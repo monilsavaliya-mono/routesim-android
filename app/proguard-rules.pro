@@ -1,4 +1,5 @@
-# RouteSim proguard rules.
-# Room, kotlinx.serialization and osmdroid ship consumer rules; nothing app-specific is required.
--keepattributes *Annotation*
--keep class com.routesim.app.data.db.entity.** { *; }
+# MockLocation ProGuard rules
+-keepclassmembers class * {
+    @com.google.gson.annotations.SerializedName <fields>;
+}
+-dontwarn org.osmdroid.**

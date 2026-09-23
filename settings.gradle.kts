@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "RouteSim"
+rootProject.name = "MockLocation"
 include(":app")
