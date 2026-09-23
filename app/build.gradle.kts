@@ -78,4 +78,8 @@ dependencies {
     // integrator and its threading are exercised with a fake, never the real
     // platform providers.
     testImplementation(libs.junit)
+    // android.jar's org.json classes are stubs that throw on a plain JVM;
+    // the file-route parsers use org.json in production (matching the
+    // geocoder's existing usage), so tests need a real implementation.
+    testImplementation(libs.json)
 }
