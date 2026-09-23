@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Pre-Compose window theme; actual Material3 theming is applied by RouteSimTheme in Compose. -->
+    <style name="Theme.RouteSim" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@color/routesim_primary</item>
+        <item name="android:windowBackground">@color/routesim_background</item>
+        <item name="android:navigationBarColor">@color/routesim_primary_dark</item>
+    </style>
+</resources>
