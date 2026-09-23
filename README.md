@@ -12,6 +12,47 @@ acceleration and braking, corner speed limits from the route's own geometry,
 and a receiver-like GPS trace — that keeps injecting fixes even while you
 switch to the app you're actually testing.
 
+This app also has a second, independent input source, **File Route
+Playback** (see below): import a JSON or CSV file of timestamped
+coordinates — a taxi trip, a train timetable, a walk, a recorded track,
+anything — and replay it through the exact same simulation/foreground-
+service/mock-location pipeline, with the file's own timestamps driving
+playback rather than the physics engine.
+
+---
+
+### Based on
+
+This project is a fork of
+[vincenzobpt/gps-mock-location](https://github.com/vincenzobpt/gps-mock-location)
+(MIT licensed). The original app — map UI, OSRM route planning,
+intermediate stops, the physically-integrated simulation clock, the
+foreground service, and Android mock-location injection — is unmodified
+except for one small, provably-safe change (see below). On top of it, this
+fork adds **File Route Playback**: importing a file of `(timestamp,
+latitude, longitude)` points and replaying it as a mock-location stream,
+using the file's own timestamps instead of the physics engine's random
+speed model.
+
+What changed, concretely:
+
+- **New**: the `fileroute` package (JSON/CSV parsing and validation, a
+  `TimedRouteGeometry` time-domain counterpart to the existing
+  `RouteGeometry`, an adapter into the existing `Route` model, and a
+  normalized JSON/CSV exporter), a `FILE` console tab, and four bundled
+  sample routes under `app/src/main/assets/sample_routes/`.
+- **Modified, additively**: `SimulationEngine` gained `setTimedRoute()`
+  and a time-driven branch in its tick loop and in `seekTo()` — every
+  existing method, and every existing route's behavior, is untouched.
+  `LatLng.interpolateTo` was upgraded from a linear lerp to a proper
+  great-circle slerp (needed for a file route's much sparser point
+  spacing; unobservable at OSRM's metre-scale segment spacing, so this
+  changes nothing for the existing route engine). `MapScreen`/`Console`
+  gained the new tab, a rail button, and Storage-Access-Framework pickers.
+- **Untouched**: manual point selection, OSRM routing, intermediate
+  stops, playback controls, telemetry, the foreground service, and mock-
+  location injection all work exactly as in the upstream project.
+
 ---
 
 ## Features
@@ -41,6 +82,12 @@ switch to the app you're actually testing.
   rail to seek anywhere along the route
 - **Clear failure states** — Missing runtime permission and "not the selected
   mock location app" are surfaced as an actionable banner, not a silent no-op
+- **File Route Playback** — Import a JSON or CSV file of timestamped
+  coordinates and replay it as a mock-location stream, driven by the file's
+  own timestamps rather than the physics engine; four bundled samples (a
+  train journey with a station dwell, a taxi trip with traffic stops, a
+  multi-stop walk, and a minimal CSV) work with no file of your own needed.
+  Export the normalized trajectory back out as JSON or CSV.
 
 ---
 
@@ -125,6 +172,73 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 
 ---
 
+## File Route Playback
+
+An alternative to manual point selection or OSRM routing: replay a route
+from a file of timestamped coordinates instead.
+
+1. Open the console and switch to the **FILE** tab (or tap the ⤓ button on
+   the map's right-hand rail).
+2. **Choose a file** — the system document picker opens, filtered to JSON
+   and CSV. Or tap one of the four bundled samples to try it immediately
+   with no file of your own.
+3. The file is parsed and validated; on success its route replaces whatever
+   was on the map, framed automatically, with its name, type, point count,
+   distance, duration, and start/end time shown right there in the tab. On
+   failure, a specific reason is shown (e.g. "Route timestamps must be
+   strictly increasing.") — nothing is silently repaired or guessed at.
+4. **Press DRIVE** — playback starts exactly like any other route: the same
+   foreground service, the same mock-location injection, the same Pause /
+   Stop / seek controls. The difference is invisible from here on — the
+   file's own timestamps are what decide the vehicle's position and speed
+   at every instant, including any stationary periods the file itself
+   describes (a stopped train, a taxi at a red light, a walker pausing at a
+   bench) — nothing is dwelled or stopped that the file didn't already say
+   to.
+5. **Export** — while a file route is loaded, export its normalized
+   trajectory (every optional field resolved — speed and bearing computed
+   wherever the source omitted them) back out as JSON or CSV.
+
+### File format
+
+JSON (the canonical/richest format):
+
+```json
+{
+  "name": "Delhi to Jaipur Test",
+  "type": "train",
+  "points": [
+    { "timestamp": "2026-09-24T08:00:00+05:30", "latitude": 28.6139, "longitude": 77.2090 },
+    { "timestamp": "2026-09-24T09:15:00+05:30", "latitude": 27.1767, "longitude": 78.0081,
+      "altitude": 171.0, "speed": 0.0, "bearing": 90.0, "accuracy": 5.0,
+      "label": "Agra", "stop": true }
+  ]
+}
+```
+
+`name` and each point's `timestamp`/`latitude`/`longitude` are required;
+`type`, `description`, `altitude`, `speed`, `bearing`, `accuracy`, `label`
+(or `station`), and `stop` are all optional. `speed`/`bearing` are computed
+from neighbouring points when omitted, and preserved as-is when supplied.
+
+CSV (a simpler alternative — required columns `timestamp`, `latitude`,
+`longitude`; `altitude`, `speed`, `bearing`, `accuracy`, `label`, `stop` are
+auto-detected when present, in any column order):
+
+```csv
+timestamp,latitude,longitude
+2026-09-24T08:00:00+05:30,28.6139,77.2090
+2026-09-24T08:05:00+05:30,28.6250,77.2200
+2026-09-24T08:15:00+05:30,28.6800,77.3000
+```
+
+Timestamps accept an ISO-8601 offset (`+05:30`), a UTC `Z` instant, or a
+raw epoch-millisecond number. They must be strictly increasing — a file
+with an out-of-order or duplicate timestamp is rejected with a clear
+message, never silently resorted.
+
+---
+
 ## Build from source
 
 ### Prerequisites (macOS)
@@ -170,7 +284,7 @@ app/build/outputs/apk/debug/app-debug.apk
 | Language | **Kotlin** 2.1.x |
 | UI | **Jetpack Compose** + Material 3, custom osmdroid overlays for the route/vehicle/pins |
 | Map | **osmdroid** 6.1 — OpenStreetMap (light) and CARTO Dark Matter (dark) tiles |
-| Routing | **OSRM** public API via Retrofit 2, arbitrary number of waypoints per request |
+| Routing | **OSRM** public API via Retrofit 2, arbitrary number of waypoints per request — or a **File Route** (JSON/CSV) imported via the Storage Access Framework |
 | Architecture | **MVVM** — single-activity, AndroidViewModel + StateFlow, with the simulation clock owned by the `Application` (not the ViewModel) so a run survives leaving the screen |
 | Persistence | `SharedPreferences` for the basemap choice |
 | Testing | **JUnit 4**, plain JVM unit tests — the mock-location backend is reached through an interface (`MockLocationPort`) so the engine's integrator and threading are tested against a fake, no device or emulator required |
@@ -194,6 +308,13 @@ gps-mock-location/
 │       │   │   ├── MockLocationApp.kt       # Application class — owns the SimulationEngine, configures osmdroid
 │       │   │   ├── data/
 │       │   │   │   └── Preferences.kt       # Basemap preference persistence
+│       │   │   ├── fileroute/                # File Route Playback (new)
+│       │   │   │   ├── TimestampedRoutePoint.kt / FileRoute.kt   # Domain model
+│       │   │   │   ├── FileRouteValidator.kt                      # List-level validation, user-facing errors
+│       │   │   │   ├── FileRouteJsonParser.kt / FileRouteCsvParser.kt / FileRouteTimestamps.kt
+│       │   │   │   ├── FileRouteAdapter.kt   # FileRoute -> existing Route + TimedRouteGeometry
+│       │   │   │   ├── FileRouteExporter.kt  # Normalized JSON/CSV export
+│       │   │   │   └── FileRouteSummary.kt   # Display-ready metadata for the FILE tab
 │       │   │   ├── location/
 │       │   │   │   ├── MockLocationEngine.kt   # Owns the platform test-location providers
 │       │   │   │   └── MockLocationPort.kt     # The interface SimulationEngine depends on (fakeable in tests)
@@ -205,18 +326,21 @@ gps-mock-location/
 │       │   │   ├── service/
 │       │   │   │   └── MockLocationService.kt  # Foreground service — keeps injecting while backgrounded
 │       │   │   ├── simulation/
-│       │   │   │   ├── SimulationEngine.kt  # The tick loop: time integration, stops, thread-safe transport
-│       │   │   │   └── RouteGeometry.kt     # Arc-length parameterisation, curvature, nearest-point snapping
+│       │   │   │   ├── SimulationEngine.kt      # The tick loop: time integration, stops, thread-safe transport
+│       │   │   │   ├── RouteGeometry.kt         # Arc-length parameterisation, curvature, nearest-point snapping
+│       │   │   │   └── TimedRouteGeometry.kt    # Time-domain counterpart, drives File Route playback (new)
 │       │   │   ├── viewmodel/
-│       │   │   │   └── MapViewModel.kt      # Map/route/search UI state; forwards transport calls to the engine
+│       │   │   │   └── MapViewModel.kt      # Map/route/search/file-route UI state; forwards transport calls to the engine
 │       │   │   └── ui/
 │       │   │       ├── MapScreen.kt         # Top-level screen layout
 │       │   │       ├── MapCanvas.kt         # osmdroid + custom route/vehicle/pin overlays
-│       │   │       ├── Console.kt           # Bottom sheet: Route / Telemetry / Tuning tabs
+│       │   │       ├── Console.kt           # Bottom sheet: Route / File / Telemetry / Tuning tabs
+│       │   │       ├── FileRoutePane.kt     # The FILE tab (new)
 │       │   │       ├── Instruments.kt       # Speed gauge, compass, elevation chart, progress rail
 │       │   │       ├── Common.kt            # Shared glass/pill/readout primitives
 │       │   │       ├── AboutDialog.kt
 │       │   │       └── theme/Theme.kt       # Material3 color scheme
+│       │   ├── assets/sample_routes/        # Bundled demo files (new)
 │       │   └── res/                         # Resources, icons, config
 │       └── test/java/com/mocklocation/app/  # Plain JVM unit tests (see Testing, below)
 ├── gradle/
@@ -291,6 +415,18 @@ mid-run correctly pausing and surfacing why, `seekTo` landing exactly on the
 requested fraction, and — the two tests that exist specifically to guard the
 locking — rapid play/pause cycling and concurrent transport commands from
 multiple threads always ending in a coherent state.
+
+File Route Playback adds its own coverage (74 tests total, plain JVM, no
+device): JSON/CSV parsing (every optional field, row-numbered errors for
+malformed timestamps/coordinates/columns), `FileRouteValidator` (empty
+file, fewer than 2 points, out-of-range/NaN/infinite coordinates, non-
+increasing and duplicate timestamps), `TimedRouteGeometry` (the canonical
+A=08:00/B=08:10 scenario — exactly A at 08:00, the midpoint at 08:05,
+exactly B at 08:10 — plus computed-vs-explicit speed, a coincident-points
+dwell reporting zero speed, bearing/altitude/accuracy overrides, the seek
+inverse lookup, and monotonicity across 500 points), and
+`SimulationEngine` integration (play/pause/resume/seek/completion driven
+by a file route through the same fake-backed harness).
 
 ---
 
