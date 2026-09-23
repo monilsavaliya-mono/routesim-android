@@ -87,6 +87,7 @@ fun MapScreen(viewModel: MapViewModel) {
     val followVehicle by viewModel.followVehicle.collectAsStateWithLifecycle()
     val waypoints by viewModel.waypoints.collectAsStateWithLifecycle()
     val mapTheme by viewModel.mapTheme.collectAsStateWithLifecycle()
+    val fileRouteSummary by viewModel.fileRouteSummary.collectAsStateWithLifecycle()
 
     // SYSTEM resolves here, where Compose already tracks the configuration, so
     // the map follows a theme change without a restart.
@@ -123,6 +124,21 @@ fun MapScreen(viewModel: MapViewModel) {
     LaunchedEffect(Unit) {
         if (!permissionsGranted) permissionLauncher.launch(requiredPermissions)
     }
+
+    // ── File Route picker / exporter ─────────────────────────────
+    // OpenDocument (not GetContent): grants a persistable read on exactly the file
+    // the user chose, no broad storage permission needed.
+    val fileRoutePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> uri?.let(viewModel::importFileRoute) }
+
+    val exportJsonLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri -> uri?.let { viewModel.exportFileRoute(it, asJson = true) } }
+
+    val exportCsvLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri -> uri?.let { viewModel.exportFileRoute(it, asJson = false) } }
 
     // ── osmdroid + permission lifecycle ─────────────────────────
     DisposableEffect(lifecycleOwner) {
@@ -337,6 +353,14 @@ fun MapScreen(viewModel: MapViewModel) {
                     onClick = viewModel::recenterOnVehicle,
                     active = followVehicle,
                 )
+                RailButton(
+                    glyph = "⤓",
+                    onClick = {
+                        consoleTab = ConsoleTab.FILE
+                        consoleExpanded = true
+                    },
+                    active = fileRouteSummary != null,
+                )
                 Spacer(Modifier.height(4.dp))
                 RailButton("+", onClick = { mapView?.controller?.zoomIn() })
                 RailButton("−", onClick = { mapView?.controller?.zoomOut() })
@@ -361,6 +385,7 @@ fun MapScreen(viewModel: MapViewModel) {
             waypoints = waypoints,
             stopFractions = remember(route, waypoints) { viewModel.stopFractions },
             mapTheme = mapTheme,
+            fileRouteSummary = fileRouteSummary,
             expanded = consoleExpanded,
             tab = consoleTab,
             isCalculating = isCalculating,
@@ -382,6 +407,16 @@ fun MapScreen(viewModel: MapViewModel) {
                 // Arm the gesture and get out of the way so the map is reachable.
                 viewModel.setMarkerMode(MarkerMode.STOP)
                 consoleExpanded = false
+            },
+            onImportFileRoute = {
+                fileRoutePicker.launch(arrayOf("application/json", "text/csv", "text/comma-separated-values", "text/*"))
+            },
+            onLoadSampleFileRoute = viewModel::loadSampleFileRoute,
+            onExportFileRouteJson = {
+                exportJsonLauncher.launch("${exportBaseName(fileRouteSummary?.name)}.json")
+            },
+            onExportFileRouteCsv = {
+                exportCsvLauncher.launch("${exportBaseName(fileRouteSummary?.name)}.csv")
             },
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -605,6 +640,13 @@ private fun AlertBanner(
 // ═══════════════════════════════════════════════════════════════
 //  HELPERS
 // ═══════════════════════════════════════════════════════════════
+
+/** A safe default filename stem for an exported file route: its own name, or a generic fallback. */
+private fun exportBaseName(routeName: String?): String =
+    (routeName?.takeIf { it.isNotBlank() } ?: "route-export")
+        .replace(Regex("[^A-Za-z0-9 _-]"), "")
+        .trim()
+        .ifBlank { "route-export" }
 
 private fun hasLocationPermission(context: android.content.Context): Boolean =
     context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==

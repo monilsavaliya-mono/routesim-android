@@ -1,0 +1,23 @@
+{
+  "name": "Delhi to Jaipur Test",
+  "type": "train",
+  "description": "Two-leg express journey with a scheduled station dwell at Alwar. Speed is left out of every point on purpose, so playback computes it from distance/time exactly as an unannotated file would.",
+  "points": [
+    { "timestamp": "2026-09-24T08:00:00+05:30", "latitude": 28.6139, "longitude": 77.2090, "label": "New Delhi", "stop": true },
+    { "timestamp": "2026-09-24T08:05:00+05:30", "latitude": 28.5476, "longitude": 77.1731 },
+    { "timestamp": "2026-09-24T08:10:00+05:30", "latitude": 28.4813, "longitude": 77.1372 },
+    { "timestamp": "2026-09-24T08:20:00+05:30", "latitude": 28.3487, "longitude": 77.0654 },
+    { "timestamp": "2026-09-24T08:55:00+05:30", "latitude": 27.8845, "longitude": 76.8141 },
+    { "timestamp": "2026-09-24T09:05:00+05:30", "latitude": 27.7519, "longitude": 76.7423 },
+    { "timestamp": "2026-09-24T09:15:00+05:30", "latitude": 27.6193, "longitude": 76.6705 },
+    { "timestamp": "2026-09-24T09:20:00+05:30", "latitude": 27.5530, "longitude": 76.6346, "label": "Alwar (arrival)", "stop": true },
+    { "timestamp": "2026-09-24T09:25:00+05:30", "latitude": 27.5530, "longitude": 76.6346, "label": "Alwar (departure)", "stop": true },
+    { "timestamp": "2026-09-24T09:35:00+05:30", "latitude": 27.4676, "longitude": 76.5217 },
+    { "timestamp": "2026-09-24T09:50:00+05:30", "latitude": 27.3395, "longitude": 76.3522 },
+    { "timestamp": "2026-09-24T10:05:00+05:30", "latitude": 27.2113, "longitude": 76.1827 },
+    { "timestamp": "2026-09-24T10:20:00+05:30", "latitude": 27.0832, "longitude": 76.0132 },
+    { "timestamp": "2026-09-24T10:30:00+05:30", "latitude": 26.9978, "longitude": 75.9003 },
+    { "timestamp": "2026-09-24T10:37:00+05:30", "latitude": 26.9380, "longitude": 75.8212 },
+    { "timestamp": "2026-09-24T10:40:00+05:30", "latitude": 26.9124, "longitude": 75.7873, "label": "Jaipur", "stop": true }
+  ]
+}

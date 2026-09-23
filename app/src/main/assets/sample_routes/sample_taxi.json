@@ -1,0 +1,23 @@
+{
+  "name": "Mumbai Taxi Trip",
+  "type": "taxi",
+  "description": "Short city trip with turns and two traffic-light stops (consecutive identical coordinates), demonstrating that the file's own timestamps — not a synthetic stop model — decide when the vehicle is stationary. Every point carries an explicit speed, which playback preserves as-is.",
+  "points": [
+    { "timestamp": "2026-09-24T08:00:00+05:30", "latitude": 19.0760, "longitude": 72.8777, "speed": 0.0, "label": "Pickup", "stop": true },
+    { "timestamp": "2026-09-24T08:00:30+05:30", "latitude": 19.0760, "longitude": 72.8800, "speed": 5.0 },
+    { "timestamp": "2026-09-24T08:01:30+05:30", "latitude": 19.0762, "longitude": 72.8850, "speed": 11.2 },
+    { "timestamp": "2026-09-24T08:03:00+05:30", "latitude": 19.0765, "longitude": 72.8920, "speed": 13.8 },
+    { "timestamp": "2026-09-24T08:04:30+05:30", "latitude": 19.0800, "longitude": 72.8940, "speed": 9.5 },
+    { "timestamp": "2026-09-24T08:05:00+05:30", "latitude": 19.0800, "longitude": 72.8940, "speed": 0.0, "label": "Traffic light", "stop": true },
+    { "timestamp": "2026-09-24T08:05:45+05:30", "latitude": 19.0800, "longitude": 72.8940, "speed": 0.0 },
+    { "timestamp": "2026-09-24T08:06:15+05:30", "latitude": 19.0830, "longitude": 72.8955, "speed": 8.0 },
+    { "timestamp": "2026-09-24T08:08:00+05:30", "latitude": 19.0870, "longitude": 72.8970, "speed": 14.1 },
+    { "timestamp": "2026-09-24T08:10:00+05:30", "latitude": 19.0910, "longitude": 72.9010, "speed": 12.0 },
+    { "timestamp": "2026-09-24T08:12:30+05:30", "latitude": 19.0930, "longitude": 72.9080, "speed": 10.5 },
+    { "timestamp": "2026-09-24T08:14:00+05:30", "latitude": 19.0930, "longitude": 72.9080, "speed": 0.0, "label": "Traffic jam", "stop": true },
+    { "timestamp": "2026-09-24T08:15:30+05:30", "latitude": 19.0940, "longitude": 72.9110, "speed": 6.5 },
+    { "timestamp": "2026-09-24T08:17:00+05:30", "latitude": 19.0960, "longitude": 72.9150, "speed": 13.0 },
+    { "timestamp": "2026-09-24T08:19:00+05:30", "latitude": 19.0990, "longitude": 72.9190, "speed": 9.0 },
+    { "timestamp": "2026-09-24T08:20:00+05:30", "latitude": 19.1010, "longitude": 72.9210, "speed": 0.0, "label": "Destination", "stop": true }
+  ]
+}

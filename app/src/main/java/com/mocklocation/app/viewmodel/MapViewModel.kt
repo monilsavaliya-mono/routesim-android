@@ -1,10 +1,19 @@
 package com.mocklocation.app.viewmodel
 
 import android.app.Application
+import android.content.ContentResolver
+import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.mocklocation.app.MockLocationApp
 import com.mocklocation.app.data.Preferences
+import com.mocklocation.app.fileroute.FileRoute
+import com.mocklocation.app.fileroute.FileRouteAdapter
+import com.mocklocation.app.fileroute.FileRouteExporter
+import com.mocklocation.app.fileroute.FileRouteImporter
+import com.mocklocation.app.fileroute.FileRouteParseResult
+import com.mocklocation.app.fileroute.FileRouteSummary
 import com.mocklocation.app.location.MockLocationEngine
 import com.mocklocation.app.model.LatLng
 import com.mocklocation.app.model.MapTheme
@@ -71,6 +80,13 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
+    // ── File Route ───────────────────────────────────────────────
+    private val _fileRouteSummary = MutableStateFlow<FileRouteSummary?>(null)
+    val fileRouteSummary: StateFlow<FileRouteSummary?> = _fileRouteSummary.asStateFlow()
+
+    /** The validated import itself, kept only for [exportFileRoute] — everything else drives off [_route]/the engine. */
+    private var currentFileRoute: FileRoute? = null
 
     // ── Camera ──────────────────────────────────────────────────
 
@@ -243,6 +259,8 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         _waypoints.value = emptyList()
         _route.value = null
         _errorMessage.value = null
+        _fileRouteSummary.value = null
+        currentFileRoute = null
         _markerMode.value = MarkerMode.START
     }
 
@@ -301,6 +319,9 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
             repository.getRoute(points).fold(
                 onSuccess = { route ->
                     _route.value = route
+                    // A calculated route replaces any file route that was loaded.
+                    _fileRouteSummary.value = null
+                    currentFileRoute = null
                     // setRoute() stops any run, because the geometry it was
                     // driving no longer exists. Say so rather than letting the
                     // simulation vanish without explanation.
@@ -318,6 +339,116 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 }
             )
             _isCalculatingRoute.value = false
+        }
+    }
+
+    // ═══ File Route ════════════════════════════════════════════
+
+    /**
+     * Reads, parses, validates and installs a route picked via the system document picker.
+     * Reuses the exact same pipeline [loadSampleFileRoute] does for a bundled sample, and
+     * the exact same [Route]/engine plumbing OSRM routing does — a file route is just a
+     * different way to arrive at those two things (section: THIS IS THE KEY DESIGN
+     * PRINCIPLE).
+     */
+    fun importFileRoute(uri: Uri) {
+        routeJob?.cancel()
+        val resolver = getApplication<Application>().contentResolver
+        routeJob = viewModelScope.launch {
+            _isCalculatingRoute.value = true
+            _errorMessage.value = null
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val text = resolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                        ?: return@runCatching FileRouteParseResult.Error("Could not open the selected file.")
+                    val fileName = queryDisplayName(resolver, uri) ?: uri.lastPathSegment ?: "route"
+                    FileRouteImporter.parse(fileName, resolver.getType(uri), text)
+                }.getOrElse {
+                    FileRouteParseResult.Error("Could not read the selected file: ${it.localizedMessage ?: it::class.simpleName}")
+                }
+            }
+            applyFileRouteResult(result)
+            _isCalculatingRoute.value = false
+        }
+    }
+
+    /** Loads one of the bundled demo files under assets/sample_routes/ through the same pipeline. */
+    fun loadSampleFileRoute(assetPath: String, displayName: String) {
+        routeJob?.cancel()
+        val assets = getApplication<Application>().assets
+        routeJob = viewModelScope.launch {
+            _isCalculatingRoute.value = true
+            _errorMessage.value = null
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val text = assets.open(assetPath).bufferedReader().use { it.readText() }
+                    FileRouteImporter.parse(displayName, mimeType = null, text = text)
+                }.getOrElse {
+                    FileRouteParseResult.Error("Could not read the sample route: ${it.localizedMessage ?: it::class.simpleName}")
+                }
+            }
+            applyFileRouteResult(result)
+            _isCalculatingRoute.value = false
+        }
+    }
+
+    private fun applyFileRouteResult(result: FileRouteParseResult) {
+        when (result) {
+            is FileRouteParseResult.Success -> {
+                val adapted = FileRouteAdapter.adapt(result.route)
+                _route.value = adapted.route
+                _fileRouteSummary.value = FileRouteSummary.from(result.route)
+                currentFileRoute = result.route
+                // The file is now the authoritative trajectory; manual start/end/stop
+                // editing state belongs to the OSRM planner, not to this route.
+                _startPoint.value = null
+                _endPoint.value = null
+                _waypoints.value = emptyList()
+                engine.setTimedRoute(adapted.route, adapted.timedGeometry)
+                requestFitRoute()
+            }
+            is FileRouteParseResult.Error -> {
+                _errorMessage.value = result.message
+            }
+        }
+    }
+
+    private fun queryDisplayName(resolver: ContentResolver, uri: Uri): String? {
+        val cursor = runCatching {
+            resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+        }.getOrNull() ?: return null
+        cursor.use {
+            if (it.moveToFirst()) {
+                val index = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (index >= 0) return it.getString(index)
+            }
+        }
+        return null
+    }
+
+    /**
+     * Writes the currently-loaded file route's normalized trajectory (section: EXPORT) to a
+     * location the user picked via `CreateDocument`. Works on any loaded file route, not
+     * just one mid-playback — this exports the source trajectory, not a live sample log.
+     */
+    fun exportFileRoute(uri: Uri, asJson: Boolean) {
+        val fileRoute = currentFileRoute
+        if (fileRoute == null) {
+            _errorMessage.value = "No file route loaded to export."
+            return
+        }
+        val resolver = getApplication<Application>().contentResolver
+        viewModelScope.launch {
+            val error = withContext(Dispatchers.IO) {
+                runCatching {
+                    val text = if (asJson) FileRouteExporter.toJson(fileRoute) else FileRouteExporter.toCsv(fileRoute)
+                    resolver.openOutputStream(uri)?.use { it.write(text.toByteArray(Charsets.UTF_8)) }
+                        ?: error("Could not open the destination file.")
+                }.exceptionOrNull()
+            }
+            if (error != null) {
+                _errorMessage.value = "Export failed: ${error.localizedMessage ?: error::class.simpleName}"
+            }
         }
     }
 

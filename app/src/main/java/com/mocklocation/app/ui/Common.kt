@@ -283,3 +283,9 @@ fun formatDecimal(value: Double, decimals: Int): String =
 
 fun formatSigned(value: Float, decimals: Int = 2): String =
     String.format(Locale.US, "%+.${decimals}f", value)
+
+/** A file route's point timestamps in the device's local time, HH:mm — "08:00", "12:15". */
+fun formatClockTime(epochMillis: Long): String =
+    java.time.Instant.ofEpochMilli(epochMillis)
+        .atZone(java.time.ZoneId.systemDefault())
+        .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm", Locale.US))

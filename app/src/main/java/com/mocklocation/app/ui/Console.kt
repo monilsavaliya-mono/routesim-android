@@ -46,6 +46,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mocklocation.app.fileroute.FileRouteSummary
 import com.mocklocation.app.model.AltitudeMode
 import com.mocklocation.app.model.FixRate
 import com.mocklocation.app.model.MapTheme
@@ -58,7 +59,7 @@ import com.mocklocation.app.simulation.SimulationEngine
 import com.mocklocation.app.ui.theme.Cockpit
 import kotlin.math.roundToInt
 
-enum class ConsoleTab { ROUTE, TELEMETRY, TUNING }
+enum class ConsoleTab { ROUTE, FILE, TELEMETRY, TUNING }
 
 /**
  * The bottom instrument console.
@@ -76,6 +77,7 @@ fun Console(
     waypoints: List<Waypoint>,
     stopFractions: List<Float>,
     mapTheme: MapTheme,
+    fileRouteSummary: FileRouteSummary?,
     expanded: Boolean,
     tab: ConsoleTab,
     isCalculating: Boolean,
@@ -94,6 +96,10 @@ fun Console(
     onClearWaypoints: () -> Unit,
     onMapThemeChange: (MapTheme) -> Unit,
     onAddStopHint: () -> Unit,
+    onImportFileRoute: () -> Unit,
+    onLoadSampleFileRoute: (assetPath: String, displayName: String) -> Unit,
+    onExportFileRouteJson: () -> Unit,
+    onExportFileRouteCsv: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     GlassSurface(
@@ -176,6 +182,13 @@ fun Console(
                                     onCycleDwell = onCycleDwell,
                                     onClearWaypoints = onClearWaypoints,
                                     onAddStopHint = onAddStopHint,
+                                )
+                                ConsoleTab.FILE -> FileRoutePane(
+                                    summary = fileRouteSummary,
+                                    onImport = onImportFileRoute,
+                                    onLoadSample = onLoadSampleFileRoute,
+                                    onExportJson = onExportFileRouteJson,
+                                    onExportCsv = onExportFileRouteCsv,
                                 )
                                 ConsoleTab.TELEMETRY -> TelemetryPane(state, config, elevationProfile)
                                 ConsoleTab.TUNING -> TuningPane(

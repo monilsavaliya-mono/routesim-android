@@ -62,6 +62,17 @@ class SimulationEngine(
     private var geometry: RouteGeometry? = null
     private val random = Random(System.nanoTime())
 
+    /**
+     * Non-null while a File Route (section: FILE ROUTE MODE) is loaded. When set, [advance]
+     * drives `distanceMeters` from the file's own timestamps instead of the physics
+     * integrator in [step] — the file is authoritative, nothing here invents a speed.
+     * [geometry] above is still built from the same point list and stays in use for
+     * position/heading/altitude/curvature queries, which is what lets every other method
+     * in this class work unmodified for a file route.
+     */
+    private var timedGeometry: TimedRouteGeometry? = null
+    private var fileElapsedMs = 0L
+
     // Integrator state — survives pause so resume continues mid-route.
     private var distanceMeters = 0.0
     private var speedMs = 0.0
@@ -136,12 +147,33 @@ class SimulationEngine(
             val geo = route?.let(::RouteGeometry)?.takeIf { it.isUsable }
             geometry = geo
             stops = if (geo == null) emptyList() else buildStops(geo, waypoints)
+            // Any plain route install exits File Route mode — a fresh OSRM/manual route
+            // has no timestamps of its own to drive playback from.
+            timedGeometry = null
+            fileElapsedMs = 0L
             _state.value = SimulationState(
                 totalDistanceMeters = geo?.totalMeters ?: 0.0,
                 updateIntervalMs = _config.value.intervalMs,
             )
         }
     }
+
+    /**
+     * Installs a route imported from a file (section: FILE ROUTE MODE). [route] is the
+     * same geometry [timed] was built from, converted once by `FileRouteAdapter` so this
+     * reuses every existing route-display and transport code path unmodified; [timed] is
+     * what [advance] reads to drive playback from the file's own timestamps rather than
+     * the physics integrator.
+     */
+    fun setTimedRoute(route: Route?, timed: TimedRouteGeometry?) {
+        setRoute(route)
+        synchronized(stateLock) {
+            timedGeometry = timed
+            fileElapsedMs = 0L
+        }
+    }
+
+    val isFileRoute: Boolean get() = timedGeometry != null
 
     /**
      * Snaps each waypoint onto the geometry OSRM returned and orders the result
@@ -275,7 +307,17 @@ class SimulationEngine(
     fun seekTo(fraction: Float) {
         val geo = geometry ?: return
         synchronized(stateLock) {
-            distanceMeters = geo.totalMeters * fraction.coerceIn(0f, 1f)
+            val clamped = fraction.coerceIn(0f, 1f)
+            val timed = timedGeometry
+            if (timed != null) {
+                // 0% = the file's first timestamp, 100% = its last — not a distance
+                // fraction, so the file's own pacing (including any stationary
+                // stretches) is what a seek lands on.
+                fileElapsedMs = (timed.totalDurationMs * clamped.toDouble()).toLong()
+                distanceMeters = timed.arcLengthAtElapsedMs(fileElapsedMs)
+            } else {
+                distanceMeters = geo.totalMeters * clamped
+            }
             speedMs = 0.0
             dwellRemainingMs = 0L
             // Stops behind the new position are already served.
@@ -296,6 +338,7 @@ class SimulationEngine(
         satellites = 11
         nextStopIndex = 0
         dwellRemainingMs = 0L
+        fileElapsedMs = 0L
     }
 
     // ── The loop ────────────────────────────────────────────────
@@ -341,6 +384,7 @@ class SimulationEngine(
                     cfg.loopRoute -> {
                         distanceMeters = 0.0
                         nextStopIndex = 0
+                        fileElapsedMs = 0L
                         false
                     }
                     else -> true
@@ -359,6 +403,8 @@ class SimulationEngine(
      * Caller must hold [stateLock].
      */
     private fun advance(geo: RouteGeometry, cfg: SimulationConfig, dtMs: Long): Float {
+        timedGeometry?.let { return advanceTimed(it, dtMs) }
+
         val dt = dtMs / 1000.0
 
         if (dwellRemainingMs > 0L) {
@@ -383,6 +429,21 @@ class SimulationEngine(
             }
         }
         return ((speedMs - previousSpeed) / dt).toFloat()
+    }
+
+    /**
+     * The File Route counterpart of [advance]: the file's timestamps say exactly where
+     * playback should be, so this looks that position up rather than integrating a speed
+     * towards a target. Caller must hold [stateLock].
+     */
+    private fun advanceTimed(timed: TimedRouteGeometry, dtMs: Long): Float {
+        val previousSpeed = speedMs
+        fileElapsedMs = (fileElapsedMs + dtMs).coerceAtMost(timed.totalDurationMs)
+        distanceMeters = timed.arcLengthAtElapsedMs(fileElapsedMs)
+        speedMs = timed.speedAtElapsedMs(fileElapsedMs)
+        elapsedMs += dtMs
+        val dtSeconds = dtMs / 1000.0
+        return if (dtSeconds > 0.0) ((speedMs - previousSpeed) / dtSeconds).toFloat() else 0f
     }
 
     /** One integration step: pick a target, ease toward it, advance. */
@@ -465,13 +526,18 @@ class SimulationEngine(
         } else truePos
 
         val hdop = (0.7f + (14 - satellites) * 0.11f).coerceIn(0.6f, 2.4f)
+        val timed = timedGeometry
 
         return _state.value.copy(
             position = truePos,
             injectedPosition = injected,
-            bearingDegrees = geo.headingAt(distanceMeters),
-            altitudeMeters = altitudeAt(geo, cfg),
-            accuracyMeters = cfg.accuracyMeters * (hdop / 1.2f),
+            // A file route's own bearing/altitude/accuracy — when it supplied them —
+            // are authoritative; only fall back to the geometry/config-derived value
+            // when the file left that field out (sections: BEARING / ALTITUDE / ACCURACY).
+            bearingDegrees = timed?.bearingOverrideAtElapsedMs(fileElapsedMs) ?: geo.headingAt(distanceMeters),
+            altitudeMeters = timed?.altitudeAtElapsedMs(fileElapsedMs) ?: altitudeAt(geo, cfg),
+            accuracyMeters = timed?.accuracyOverrideAtElapsedMs(fileElapsedMs)
+                ?: (cfg.accuracyMeters * (hdop / 1.2f)),
             speedKmh = (speedMs * 3.6).toFloat(),
             targetSpeedKmh = (targetSpeedMs * 3.6).toFloat(),
             curveLimitKmh = geo.speedLimitAhead(distanceMeters, max(40.0, speedMs * 4.0))

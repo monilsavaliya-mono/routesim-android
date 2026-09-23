@@ -1,0 +1,17 @@
+{
+  "name": "London Park Walk",
+  "type": "walk",
+  "description": "A short walk with two casual stops along the way, each held by two consecutive points at the same coordinates a few minutes apart — the file's own stationary periods, with no synthetic station-stop model involved.",
+  "points": [
+    { "timestamp": "2026-09-24T08:00:00+05:30", "latitude": 51.5074, "longitude": -0.1278, "label": "Start", "stop": true },
+    { "timestamp": "2026-09-24T08:02:00+05:30", "latitude": 51.5078, "longitude": -0.1275 },
+    { "timestamp": "2026-09-24T08:05:00+05:30", "latitude": 51.5085, "longitude": -0.1268 },
+    { "timestamp": "2026-09-24T08:07:00+05:30", "latitude": 51.5088, "longitude": -0.1264, "label": "Bench", "stop": true },
+    { "timestamp": "2026-09-24T08:11:00+05:30", "latitude": 51.5088, "longitude": -0.1264 },
+    { "timestamp": "2026-09-24T08:14:00+05:30", "latitude": 51.5096, "longitude": -0.1254 },
+    { "timestamp": "2026-09-24T08:17:00+05:30", "latitude": 51.5100, "longitude": -0.1250, "label": "Checking map", "stop": true },
+    { "timestamp": "2026-09-24T08:19:00+05:30", "latitude": 51.5100, "longitude": -0.1250 },
+    { "timestamp": "2026-09-24T08:22:00+05:30", "latitude": 51.5112, "longitude": -0.1240 },
+    { "timestamp": "2026-09-24T08:26:00+05:30", "latitude": 51.5125, "longitude": -0.1225, "label": "Destination", "stop": true }
+  ]
+}
