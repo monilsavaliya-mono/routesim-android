@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import com.mocklocation.app.BuildConfig
 import com.mocklocation.app.model.LatLng
 import com.mocklocation.app.model.Route
 import com.mocklocation.app.model.SimulationState
@@ -54,6 +55,7 @@ fun MapCanvas(
     endPoint: LatLng?,
     waypoints: List<LatLng>,
     nightMode: Boolean,
+    useMapboxTiles: Boolean,
     onLongPress: (LatLng) -> Unit,
     onUserPan: () -> Unit,
     onMapReady: (MapView) -> Unit,
@@ -115,7 +117,7 @@ fun MapCanvas(
             }
         },
         update = { map ->
-            applyTileStyle(map, nightMode)
+            applyTileStyle(map, nightMode, useMapboxTiles)
 
             val density = map.resources.displayMetrics.density
             routeOverlay.density = density
@@ -157,17 +159,50 @@ private val darkTiles: OnlineTileSourceBase by lazy {
     )
 }
 
+/**
+ * Mapbox raster tiles via the Styles API's static raster endpoint, using a
+ * *public* token (the `pk.` prefix) — the kind Mapbox's own docs say is meant
+ * to be embedded in client apps, unlike a secret token. Restrict it to this
+ * app's package name in the Mapbox dashboard if you want to tighten it further.
+ *
+ * The token itself lives in `local.properties` (gitignored) and is read into
+ * [BuildConfig.MAPBOX_ACCESS_TOKEN] at build time — not because this token is
+ * secret, but because GitHub's push protection rejects any commit containing
+ * what looks like a Mapbox token, public or not.
+ *
+ * https://api.mapbox.com/styles/v1/{username}/{style}/tiles/{z}/{x}/{y}?access_token=...
+ */
+private fun mapboxTileSource(name: String, styleId: String): OnlineTileSourceBase = XYTileSource(
+    name,
+    0, 20, 256,
+    // XYTileSource has no separate query-string parameter, so the access
+    // token rides along as the "filename ending" — the same trick the CARTO
+    // source above uses for its plain ".png".
+    "?access_token=${BuildConfig.MAPBOX_ACCESS_TOKEN}",
+    arrayOf("https://api.mapbox.com/styles/v1/mapbox/$styleId/tiles/"),
+    "© Mapbox © OpenStreetMap contributors",
+)
+
+private val mapboxLightTiles: OnlineTileSourceBase by lazy { mapboxTileSource("MapboxStreets", "streets-v12") }
+private val mapboxDarkTiles: OnlineTileSourceBase by lazy { mapboxTileSource("MapboxDark", "dark-v11") }
+
 /** Slight desaturation on the day map so the route accents stay dominant. */
 private val dayFilter: ColorMatrixColorFilter by lazy {
     ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0.82f) })
 }
 
-private fun applyTileStyle(map: MapView, night: Boolean) {
-    val wanted = if (night) darkTiles else TileSourceFactory.MAPNIK
+private fun applyTileStyle(map: MapView, night: Boolean, useMapbox: Boolean) {
+    val wanted = when {
+        useMapbox && night -> mapboxDarkTiles
+        useMapbox -> mapboxLightTiles
+        night -> darkTiles
+        else -> TileSourceFactory.MAPNIK
+    }
     if (map.tileProvider.tileSource.name() != wanted.name()) {
         map.setTileSource(wanted)
     }
-    map.overlayManager.tilesOverlay?.setColorFilter(if (night) null else dayFilter)
+    // Mapbox's own styles are already tuned; only the free OSM/CARTO day tiles need the filter.
+    map.overlayManager.tilesOverlay?.setColorFilter(if (night || useMapbox) null else dayFilter)
     map.setBackgroundColor(if (night) Cockpit.Void.toArgb() else AndroidColor.WHITE)
 }
 

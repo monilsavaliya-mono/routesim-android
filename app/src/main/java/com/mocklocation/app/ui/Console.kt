@@ -77,6 +77,7 @@ fun Console(
     waypoints: List<Waypoint>,
     stopFractions: List<Float>,
     mapTheme: MapTheme,
+    useMapboxTiles: Boolean,
     fileRouteSummary: FileRouteSummary?,
     expanded: Boolean,
     tab: ConsoleTab,
@@ -95,6 +96,7 @@ fun Console(
     onCycleDwell: (Int) -> Unit,
     onClearWaypoints: () -> Unit,
     onMapThemeChange: (MapTheme) -> Unit,
+    onUseMapboxTilesChange: (Boolean) -> Unit,
     onAddStopHint: () -> Unit,
     onImportFileRoute: () -> Unit,
     onLoadSampleFileRoute: (assetPath: String, displayName: String) -> Unit,
@@ -194,8 +196,10 @@ fun Console(
                                 ConsoleTab.TUNING -> TuningPane(
                                     config = config,
                                     mapTheme = mapTheme,
+                                    useMapboxTiles = useMapboxTiles,
                                     onChange = onConfigChange,
                                     onMapThemeChange = onMapThemeChange,
+                                    onUseMapboxTilesChange = onUseMapboxTilesChange,
                                 )
                             }
                             Spacer(Modifier.height(8.dp))
@@ -825,8 +829,10 @@ private fun ProviderRow(state: SimulationState) {
 private fun TuningPane(
     config: SimulationConfig,
     mapTheme: MapTheme,
+    useMapboxTiles: Boolean,
     onChange: ((SimulationConfig) -> SimulationConfig) -> Unit,
     onMapThemeChange: (MapTheme) -> Unit,
+    onUseMapboxTilesChange: (Boolean) -> Unit,
 ) {
     Column(Modifier.fillMaxWidth()) {
 
@@ -837,14 +843,26 @@ private fun TuningPane(
             onSelect = onMapThemeChange,
         )
         Text(
-            text = when (mapTheme) {
-                MapTheme.SYSTEM -> "Follows the device light/dark setting"
-                MapTheme.DARK -> "Always dark — CARTO Dark Matter"
-                MapTheme.LIGHT -> "Always light — OpenStreetMap standard"
+            text = when {
+                useMapboxTiles && mapTheme == MapTheme.SYSTEM -> "Mapbox — follows the device light/dark setting"
+                useMapboxTiles && mapTheme == MapTheme.DARK -> "Mapbox — dark-v11"
+                useMapboxTiles -> "Mapbox — streets-v12"
+                mapTheme == MapTheme.SYSTEM -> "Follows the device light/dark setting"
+                mapTheme == MapTheme.DARK -> "Always dark — CARTO Dark Matter"
+                else -> "Always light — OpenStreetMap standard"
             },
             color = Cockpit.InkFaint,
             fontSize = 10.sp,
             modifier = Modifier.padding(top = 6.dp),
+        )
+
+        Spacer(Modifier.height(10.dp))
+
+        ToggleRow(
+            title = "Mapbox tiles",
+            subtitle = "Use your Mapbox access token instead of the default OpenStreetMap/CARTO tiles",
+            checked = useMapboxTiles,
+            onCheckedChange = onUseMapboxTilesChange,
         )
 
         Spacer(Modifier.height(16.dp))

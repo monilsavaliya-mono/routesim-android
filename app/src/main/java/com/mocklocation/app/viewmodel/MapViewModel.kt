@@ -114,6 +114,11 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setMapTheme(theme: MapTheme) = preferences.setMapTheme(theme)
 
+    /** Persisted: Mapbox raster tiles instead of the default keyless OpenStreetMap/CARTO ones. */
+    val useMapboxTiles: StateFlow<Boolean> = preferences.useMapboxTiles
+
+    fun setUseMapboxTiles(enabled: Boolean) = preferences.setUseMapboxTiles(enabled)
+
     // ── Search ──────────────────────────────────────────────────
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()

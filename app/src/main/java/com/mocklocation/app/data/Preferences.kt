@@ -25,8 +25,18 @@ class Preferences(context: Context) {
         prefs.edit().putString(KEY_MAP_THEME, theme.name).apply()
     }
 
+    /** Mapbox raster tiles instead of the default OpenStreetMap/CARTO ones. */
+    private val _useMapboxTiles = MutableStateFlow(prefs.getBoolean(KEY_USE_MAPBOX, false))
+    val useMapboxTiles: StateFlow<Boolean> = _useMapboxTiles.asStateFlow()
+
+    fun setUseMapboxTiles(enabled: Boolean) {
+        _useMapboxTiles.value = enabled
+        prefs.edit().putBoolean(KEY_USE_MAPBOX, enabled).apply()
+    }
+
     private companion object {
         const val FILE = "mocklocation_prefs"
         const val KEY_MAP_THEME = "map_theme"
+        const val KEY_USE_MAPBOX = "use_mapbox_tiles"
     }
 }

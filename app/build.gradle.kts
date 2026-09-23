@@ -1,8 +1,18 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
+
+// Read from local.properties (gitignored, never committed) so a Mapbox token
+// never lands in source control — GitHub's push protection rejects a commit
+// containing one even when it's a public token.
+val mapboxAccessToken: String = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}.getProperty("MAPBOX_ACCESS_TOKEN", "")
 
 android {
     namespace = "com.mocklocation.app"
@@ -17,6 +27,8 @@ android {
         // here: one code per release, 1.0.0=1 … 1.3.0=4.
         versionCode = 4
         versionName = "1.3.0"
+
+        buildConfigField("String", "MAPBOX_ACCESS_TOKEN", "\"$mapboxAccessToken\"")
     }
 
     buildTypes {

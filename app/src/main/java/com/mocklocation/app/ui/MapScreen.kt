@@ -87,6 +87,7 @@ fun MapScreen(viewModel: MapViewModel) {
     val followVehicle by viewModel.followVehicle.collectAsStateWithLifecycle()
     val waypoints by viewModel.waypoints.collectAsStateWithLifecycle()
     val mapTheme by viewModel.mapTheme.collectAsStateWithLifecycle()
+    val useMapboxTiles by viewModel.useMapboxTiles.collectAsStateWithLifecycle()
     val fileRouteSummary by viewModel.fileRouteSummary.collectAsStateWithLifecycle()
 
     // SYSTEM resolves here, where Compose already tracks the configuration, so
@@ -194,6 +195,7 @@ fun MapScreen(viewModel: MapViewModel) {
             endPoint = endPoint,
             waypoints = waypoints.map { it.latLng },
             nightMode = nightMap,
+            useMapboxTiles = useMapboxTiles,
             onLongPress = viewModel::onMapLongPress,
             onUserPan = { if (followVehicle) viewModel.setFollowVehicle(false) },
             onMapReady = { mapView = it },
@@ -385,6 +387,7 @@ fun MapScreen(viewModel: MapViewModel) {
             waypoints = waypoints,
             stopFractions = remember(route, waypoints) { viewModel.stopFractions },
             mapTheme = mapTheme,
+            useMapboxTiles = useMapboxTiles,
             fileRouteSummary = fileRouteSummary,
             expanded = consoleExpanded,
             tab = consoleTab,
@@ -403,6 +406,7 @@ fun MapScreen(viewModel: MapViewModel) {
             onCycleDwell = viewModel::cycleWaypointDwell,
             onClearWaypoints = viewModel::clearWaypoints,
             onMapThemeChange = viewModel::setMapTheme,
+            onUseMapboxTilesChange = viewModel::setUseMapboxTiles,
             onAddStopHint = {
                 // Arm the gesture and get out of the way so the map is reachable.
                 viewModel.setMarkerMode(MarkerMode.STOP)
